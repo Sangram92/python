@@ -1,0 +1,273 @@
+
+
+from elasticsearch import Elasticsearch
+es = Elasticsearch([{'host': '127.0.0.1', 'port': 9200}])
+
+search_result = es.search(index="5d370072217231b997747fd3", body=query)
+query = {
+    "query": {
+        "function_score": {
+            "query": {
+                "match": {
+                    "question_set.question": "tableau"
+                }
+            }
+        }
+    }
+}
+
+query = {
+    "query": {
+        "function_score": {
+            "query": {
+                "match": {
+                    "question_set.question": "medicine"
+                }
+            }
+        }
+    }
+}
+
+{
+    "query": {
+        "function_score": {
+            "query": {
+                "multi_match": {
+                    "type": "phrase",
+                    "query": "scd",
+                    "fields": ["question_set.question"],
+                    "analyzer": "es_analyzer"
+                }
+            },
+            "field_value_factor": {
+                "field": "votes",
+                "modifier": "log2p"
+            }
+        }
+    }
+}
+
+-------------------------------------------------------
+import os
+import json
+import itertools, nltk, string
+from elasticsearch import Elasticsearch
+
+class FAQElasticSearch():
+    """Store & Update ElasticSearch Document"""
+    def __init__(self):
+        self.es_host = os.environ.get('ES_HOST') or 'localhost'
+        self.es_port = os.environ.get('ES_PORT') or '9200'
+
+    def connect_elasticsearch(self):
+        # return elasticsearch obj
+        try:
+            return Elasticsearch([{'host': str(self.es_host), 'port': int(self.es_port)}])
+        except Exception as e:
+            logger.error('Error in connecting to ElasticSearch server - {}'.format(e))
+            return False
+
+    def process_faq_mapping(self, faq_data):
+        """extract key_phrases, predict question_type and create elastic search mapping"""
+        try:
+            if not faq_data or not faq_data.get("question_answer"):
+                return False
+
+            faq_id = faq_data.get("id")
+            if not faq_id:
+                return False
+            es_data = {
+                faq_id: []
+            }
+            # extract key_phrases & predict question type
+            for row in faq_data.get("question_answer"):
+                row["votes"] = 0
+                es_data[faq_id].append(row)
+
+            result = self.create_es_knowledgebase(faq_id, es_data)
+            return result
+        except Exception as e:
+            print("errorrrrrrrrr ----------------------------------", str(e))
+            return False
+
+    def create_es_knowledgebase(self, faq_id, es_data, es_analyzer="en"):
+        es = self.connect_elasticsearch()
+        if es:
+            data_mapping = self.get_settings_and_mapping(faq_id, es_analyzer)
+            if not data_mapping:
+                return False
+
+            # Delete previous documents at the same index
+            try:
+                if es.indices.exists(index=faq_id):
+                    data = es_data[faq_id]
+                    es.indices.delete(index=faq_id, ignore=[400, 404])
+            except Exception as e:
+                logger.error('Error in deleting knowledgebase index in Elasticsearch - es - {}'.format(e))
+
+            # Create mapping index
+            try:
+                qna = es_data[faq_id]
+                for items in qna:
+                    es.create(index=faq_id, doc_type=faq_id, id=items['id'], body=data_mapping)
+            except Exception as e:
+                logger.error('Error in creating mapping index knowledgebase in Elasticsearch - {}'.format(e))
+                return False
+
+            # index documents
+            try:
+                qna = es_data[faq_id]
+                for items in qna:
+                    es.index(index=faq_id, doc_type=faq_id, id = items['id'], body=items)
+                return True
+            except Exception as e:
+                logger.error('Error in creating knowledgebase in Elasticsearch - {}'.format(e))
+                return False
+        else:
+            return False
+
+    def get_settings_and_mapping(self, faq_id, es_analyzer):
+        try:
+            es = self.connect_elasticsearch()
+            if es:
+                return {
+                    "settings": {
+                        "index": {
+                            "similarity": {
+                                "default": {
+                                    "type": "BM25"
+                                }
+                            },
+                            "analysis": {
+                                "filter": {
+                                    "search_synonym_filter": {
+                                        "type": "synonym",
+                                        "synonyms": [
+                                            "sneakers,pumps",
+                                            "medicine,tableau"
+                                        ]
+                                    }
+                                },
+                                "analyzer": {
+                                    "search_synonyms": {
+                                        "filter": [
+                                            "search_synonym_filter"
+                                        ],
+                                        "tokenizer": "standard"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "mappings": {
+                        faq_id: {
+                            "properties": {
+                                "answer": {
+                                    "type": "string",
+                                    "fields": {
+                                        "stemmed": {
+                                            "type": "string",
+                                            "analyzer": "search_synonyms",
+                                        }
+                                    }
+                                },
+                                "qid": {
+                                    "type": "string",
+                                    "fields": {
+                                        "stemmed": {
+                                            "type": "string",
+                                            "analyzer": "search_synonyms"
+                                        }
+                                    }
+                                },
+                                "question_set": {
+                                    "properties": {
+                                        "question":{
+                                            "type": "string",
+                                            "fields": {
+                                                "stemmed": {
+                                                    "type": "string",
+                                                    "analyzer": "search_synonyms"
+                                                }
+                                            }
+                                        },
+                                        "question_type":{
+                                            "type": "string",
+                                            "fields": {
+                                                "stemmed": {
+                                                    "type": "string",
+                                                    "analyzer": "search_synonyms"
+                                                }
+                                            }
+                                        },
+                                        "key_phrases": {
+                                            "type": "array",
+                                            "fields": {
+                                                "stemmed": {
+                                                    "type": "string",
+                                                    "analyzer": "search_synonyms"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "votes": {
+                                    "type": "integer",
+                                    "fields": {
+                                        "stemmed": {
+                                            "type": "integer",
+                                            "analyzer": "search_synonyms"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            return False
+        except Exception as e:
+            return False
+
+
+#  Query Examples 
+
+{
+  "query": { 
+    "bool": { 
+      "must": [
+        { "match": { "question_set.question": "Search"}}, 
+        { "match": { "content": "Elasticsearch" }}  
+      ],
+      "filter": [ 
+        { "term":  { "status": "published" }}, 
+        { "range": { "publish_date": { "gte": "2015-01-01" }}} 
+      ]
+    }
+  }
+}
+
+{
+    "query": {
+        "function_score": {
+            "query": {
+                "match": { "message": "elasticsearch" }
+            },
+            "script_score" : {
+                "script" : {
+                  "source": "Math.log(2 + doc['likes'].value)"
+                }
+            }
+        }
+    }
+}
+
+
+{
+    "query": {
+        "function_score": {
+            "query": {
+                "match": {"question_set.question": "stock out" }
+            }
+        }
+    }
+}

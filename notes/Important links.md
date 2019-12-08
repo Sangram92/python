@@ -27,3 +27,7 @@ https://learnbatta.com/blog/understanding-request-response-lifecycle-in-django-2
 - Basics of set
 
 https://www.datacamp.com/community/tutorials/sets-in-python#targetText=Lists%20and%20tuples%20are%20standard,element%20and%20store%20unordered%20values.
+
+- Python Bitwise operators
+
+https://data-flair.training/blogs/python-bitwise-operators/#:~:targetText=Python%20Bitwise%20XOR%20(%5E)%20Operator,Otherwise%2C%20it%20returns%200.

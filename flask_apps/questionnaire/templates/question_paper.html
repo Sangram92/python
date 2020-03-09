@@ -1,0 +1,33 @@
+<html>
+	<head>
+		<title>Exam</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<link href="static/bootstrap.min.css" rel="stylesheet" media="screen">
+	</head>
+	<body>
+    <div class="container">
+		<h2>MySQL Multiple Choice Questions</h2>
+		<hr>
+		<br>
+		<form action="{{ url_for('exam.question') }}" method='POST'>
+			{{question['question']}}
+			<input type="text" name="idx", value="{{question['idx']}}" style="visibility: hidden;">
+			<input type="text" name="que_id", value="{{question['_id']}}" style="visibility: hidden;">
+			<input type="text" name="participant", value="{{question['participant']}}" 
+				style="visibility: hidden;">
+			<ol>
+				<br><input type='radio' value='{{question["option1"]}}' name='option1'>
+					{{question["option1"]}}
+				<br><input type='radio' value='{{question["option2"]}}' name='option2'>
+					{{question["option2"]}}
+				<br><input type='radio' value='{{question["option3"]}}' name='option3'>
+					{{question["option3"]}}
+				<br><input type='radio' value='{{question["option4"]}}' name='option4'>
+					{{question["option4"]}}
+				<br>
+			</ol>
+			<input class="btn btn-default" type="submit" value="Submit">
+		</form>
+    </div>
+	</body>
+</html>

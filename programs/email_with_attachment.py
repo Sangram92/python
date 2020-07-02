@@ -1,27 +1,30 @@
 import smtplib
+import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
+from email.mime.image import MIMEImage
 from email.mime.application import MIMEApplication
 from email import encoders
 from os.path import basename
 
 # credentials
+sender = 'patil.sangram01@gmail.com'
 receiver = 'patil.sangram01@gmail.com'
-sender = 'XXXXXX@XXXXX.com'
-password = 'XXXXXXXXXX'
-subject = 'Email Subject'
+password = ''
 
 # here you can pass attachment file location.
 attachment = ''
 
-mail_content = '''Hi,
+subject = 'Email Subject'
+mail_content = '''
+	Hi,
 
-This is a test email. Ignore it.
+	This is a test email. Ignore it.
 
 
-Thanks,
-Sangram.
+	Thanks,
+	Sangram.
 '''
 
 try:
@@ -33,14 +36,24 @@ try:
 	message.attach(MIMEText(mail_content))
 
 	if attachment:
-		with open(attachment, "rb") as file_:
-			part = MIMEApplication(
-				file_.read(),
-				Name=basename(attachment)
-			)
-		encoders.encode_base64(part)
-		part['Content-Disposition'] = 'attachment; filename="%s"' % basename(attachment)
-		message.attach(part)
+		# image attachment
+		if attachment.split(".")[-1].lower() in ['jpg', 'png', 'jpeg']:
+			img_data = open(attachment, 'rb').read()
+			image = MIMEImage(img_data, name=os.path.basename(attachment))
+			message.attach(image)
+		else:
+			with open(attachment, "rb") as file_:
+				part = MIMEApplication(
+					file_.read(),
+					Name=basename(attachment)
+				)
+			encoders.encode_base64(part)
+			part['Content-Disposition'] = 'attachment; filename="%s"' % basename(attachment)
+			message.attach(part)
+
+	# take user password
+	if not password:
+		password = raw_input("Please enter password here ... ")
 
 	#Create SMTP session for sending the mail
 
